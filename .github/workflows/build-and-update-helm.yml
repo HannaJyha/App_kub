@@ -9,6 +9,9 @@ jobs:
   build-and-update-helm:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout app repo
         uses: actions/checkout@v4
@@ -17,10 +20,12 @@ jobs:
         run: |
           REPO_NAME=$(echo "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')
           IMAGE_TAG="${GITHUB_REF#refs/tags/}"
-          IMAGE_REPO="${{ secrets.DOCKER_REGISTRY }}/$REPO_NAME"
+          FULL_IMAGE_REPO="${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/$REPO_NAME"
           echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "IMAGE_REPO=$IMAGE_REPO" >> $GITHUB_ENV
+
+          echo "Image will be tagged as: $FULL_IMAGE_REPO:$IMAGE_TAG"
 
       - name: Log in to Docker registry
         uses: docker/login-action@v2
@@ -49,9 +54,10 @@ jobs:
       - name: Update values.yaml in Helm repo
         run: |
           cd helm-repo
-          yq eval -i ".image.repository = \"${IMAGE_REPO}\" | .image.tag = \"${IMAGE_TAG}\"" values.yaml
+          yq eval -i ".image.repository = \"${FULL_IMAGE_REPO}\" | .image.tag = \"${IMAGE_TAG}\"" values.yaml
+          
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add values.yaml
-          git commit -m "ci: update image to ${IMAGE_REPO}:${IMAGE_TAG}" || echo "No changes to commit"
+          git commit -m "ci: update image to ${FULL_IMAGE_REPO}:${IMAGE_TAG}" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.HELM_REPO_PAT }}@github.com/HannaJyha/Helm_Kub.git HEAD:main
