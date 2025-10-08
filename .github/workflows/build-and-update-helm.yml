@@ -43,18 +43,15 @@ jobs:
 
       - name: Install yq (tool to manipulate YAML safely)
         run: |
-          # версия может меняться — можно проверить релиз yq на GitHub
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Update values.yaml in Helm repo
+      - name: Set variables
         run: |
-          cd helm-repo
-          # безопасно изменяем поля image.repository и image.tag
-          yq eval -i ".image.repository = \"${IMAGE_REPO}\" | .image.tag = \"${IMAGE_TAG}\"" values.yaml
-          git add values.yaml
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git commit -m "ci: update image to ${IMAGE_REPO}:${IMAGE_TAG}" || echo "No changes to commit"
-          # пушим через PAT в URL; замените branch если нужно
-          git push https://x-access-token:${{ secrets.HELM_REPO_PAT }}@github.com/your-username/Helm_Kub.git HEAD:main
+          REPO_NAME=$(echo "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_TAG="${GITHUB_REF#refs/tags/}"
+          IMAGE_REPO="${{ secrets.DOCKER_REGISTRY }}/$REPO_NAME"
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "IMAGE_REPO=$IMAGE_REPO" >> $GITHUB_ENV
+
